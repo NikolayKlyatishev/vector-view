@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}Поиск - BMK RAG Interface{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h4>
+            <i class="fas fa-search me-2"></i>Семантический поиск
+        </h4>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header py-2">
+                <h6 class="mb-0">
+                    <i class="fas fa-search me-2"></i>Параметры поиска
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="searchForm">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="queryInput" class="form-label">Поисковый запрос *</label>
+                                <input type="text" class="form-control" id="queryInput" 
+                                       placeholder="Введите ваш запрос..." required>
+                                <div class="form-text">
+                                    Используйте естественный язык для описания того, что вы ищете.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="schemaFilter" class="form-label">Фильтр по схеме</label>
+                                <select class="form-select" id="schemaFilter">
+                                    <option value="">Все схемы</option>
+                                    <option value="workflow">Workflow</option>
+                                    <option value="form">Form</option>
+                                    <option value="grid">Grid</option>
+                                    <option value="page">Page</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="topK" class="form-label">Количество результатов</label>
+                                <select class="form-select" id="topK">
+                                    <option value="5" selected>5</option>
+                                    <option value="10">10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="fas fa-search me-1"></i>Поиск
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearForm()">
+                                <i class="fas fa-times me-1"></i>Очистить
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div id="loading" class="loading text-center py-4">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Выполняется поиск...</p>
+        </div>
+        
+        <div id="search-results">
+            <!-- Результаты поиска будут загружены через JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для детального просмотра результата -->
+<div class="modal fade" id="resultModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-alt me-2"></i>Детали результата
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-content">
+                    <!-- Содержимое будет загружено через JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.getElementById('searchForm');
+    searchForm.addEventListener('submit', handleSearch);
+    
+    // Загружаем примеры запросов
+    loadExampleQueries();
+});
+
+async function handleSearch(event) {
+    event.preventDefault();
+    
+    const query = document.getElementById('queryInput').value.trim();
+    const schemaFilter = document.getElementById('schemaFilter').value;
+    const topK = parseInt(document.getElementById('topK').value);
+    
+    if (!query) {
+        showAlert('Пожалуйста, введите поисковый запрос', 'warning');
+        return;
+    }
+    
+    await performSearch(query, schemaFilter, topK);
+}
+
+async function performSearch(query, schemaFilter, topK) {
+    showLoading('loading');
+    
+    try {
+        const response = await fetch('/api/search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                schema_filter: schemaFilter || null,
+                top_k: topK
+            })
+        });
+        
+        const data = await response.json();
+        hideLoading('loading');
+        
+        if (data.error) {
+            showAlert(data.error, 'danger');
+            return;
+        }
+        
+        displaySearchResults(data);
+    } catch (error) {
+        hideLoading('loading');
+        console.error('Ошибка поиска:', error);
+        showAlert('Ошибка поиска: ' + error.message, 'danger');
+    }
+}
+
+function displaySearchResults(data) {
+    const container = document.getElementById('search-results');
+    
+    if (!data.results || data.results.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                По вашему запросу ничего не найдено. Попробуйте изменить запрос или убрать фильтры.
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Результаты поиска
+                </h5>
+                <span class="badge bg-primary">${data.results.length} результатов</span>
+            </div>
+            <div class="card-body">
+    `;
+    
+    data.results.forEach((result, index) => {
+        const metadata = result.metadata || {};
+        const schema = metadata.schema || 'Неизвестно';
+        const section = metadata.section || 'Неизвестно';
+        const path = metadata.path || 'Неизвестно';
+        const jsonPointer = metadata.json_pointer || '';
+        const distance = result.distance || 0;
+        
+        // Обрезаем длинный контент для предварительного просмотра
+        const previewLength = 200;
+        const fullContent = result.document;
+        const isLong = fullContent.length > previewLength;
+        const previewContent = isLong ? fullContent.substring(0, previewLength) + '...' : fullContent;
+        
+        html += `
+            <div class="search-result">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h6 class="mb-1">
+                            <i class="fas fa-file-alt me-1"></i>
+                            Результат #${index + 1}
+                        </h6>
+                        <div class="metadata">
+                            <span class="badge bg-primary me-1">${schema}</span>
+                            <span class="badge bg-secondary me-1">${section}</span>
+                            <span class="text-muted">${path.split('/').pop()}</span>
+                            ${jsonPointer ? `<span class="text-muted"> | ${jsonPointer}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="distance">Расстояние: ${distance.toFixed(4)}</span>
+                        <br>
+                        <button class="btn btn-sm btn-outline-primary mt-1" 
+                                onclick="showResultDetails(${index}, '${escapeHtml(JSON.stringify(result))}')">
+                            <i class="fas fa-eye me-1"></i>Детали
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="chunk-content">
+                    <pre class="mb-0">${escapeHtml(previewContent)}</pre>
+                </div>
+                
+                ${isLong ? '<p class="text-muted small mt-2">Нажмите "Детали" для полного содержимого</p>' : ''}
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function showResultDetails(index, resultJson) {
+    const result = JSON.parse(resultJson);
+    const metadata = result.metadata || {};
+    
+    const modalContent = document.getElementById('modal-content');
+    modalContent.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Метаданные</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Схема:</strong></td><td>${metadata.schema || 'Неизвестно'}</td></tr>
+                    <tr><td><strong>Секция:</strong></td><td>${metadata.section || 'Неизвестно'}</td></tr>
+                    <tr><td><strong>Файл:</strong></td><td>${metadata.path || 'Неизвестно'}</td></tr>
+                    <tr><td><strong>Указатель:</strong></td><td>${metadata.json_pointer || 'Нет'}</td></tr>
+                    <tr><td><strong>Расстояние:</strong></td><td>${result.distance.toFixed(4)}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Полное содержимое</h6>
+                <div class="chunk-content">
+                    <pre class="mb-0">${escapeHtml(result.document)}</pre>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    modal.show();
+}
+
+function clearForm() {
+    document.getElementById('queryInput').value = '';
+    document.getElementById('schemaFilter').value = '';
+    document.getElementById('topK').value = '5';
+    document.getElementById('search-results').innerHTML = '';
+}
+
+function loadExampleQueries() {
+    // Можно добавить примеры запросов для помощи пользователю
+    const examples = [
+        "Как настроить workflow?",
+        "Поля формы для ввода данных",
+        "Конфигурация сетки",
+        "Настройки страницы"
+    ];
+    
+    // Добавляем примеры как подсказки
+    const queryInput = document.getElementById('queryInput');
+    queryInput.setAttribute('list', 'example-queries');
+    
+    const datalist = document.createElement('datalist');
+    datalist.id = 'example-queries';
+    
+    examples.forEach(example => {
+        const option = document.createElement('option');
+        option.value = example;
+        datalist.appendChild(option);
+    });
+    
+    document.body.appendChild(datalist);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

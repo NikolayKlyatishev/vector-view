@@ -1,0 +1,677 @@
+{% extends "base.html" %}
+
+{% block title %}Векторы - BMK RAG Interface{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>
+                <i class="fas fa-project-diagram me-2"></i>Визуализация векторов
+            </h4>
+            <div class="d-flex gap-1">
+                <select class="form-select form-select-sm" id="schemaFilter" onchange="loadVectors()" style="width: auto;">
+                    <option value="">Все схемы</option>
+                    <option value="workflow">Workflow</option>
+                    <option value="form">Form</option>
+                    <option value="grid">Grid</option>
+                    <option value="page">Page</option>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" onclick="loadVectors()">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="resetView()">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>2D Векторное пространство
+                </h6>
+                <div class="d-flex gap-1 align-items-center">
+                    <small class="text-muted" id="vectorCount">Загрузка...</small>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary" onclick="zoomIn()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="zoomOut()">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="loading" class="loading text-center py-4">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2">Загрузка векторов...</p>
+                </div>
+                
+                <div id="canvas-container" style="position: relative; width: 100%; height: 500px; overflow: hidden;">
+                    <canvas id="vectorCanvas" width="800" height="500" 
+                            style="border: 1px solid #dee2e6; cursor: grab;"
+                            onmousedown="startPan(event)" 
+                            onmousemove="pan(event)" 
+                            onmouseup="endPan(event)"
+                            onwheel="handleWheel(event)">
+                    </canvas>
+                    <!-- Tooltip для векторов -->
+                    <div id="vectorTooltip" class="vector-tooltip" style="display: none;">
+                        <div class="tooltip-content">
+                            <div class="tooltip-header">
+                                <strong id="tooltipSchema"></strong>
+                                <span class="badge" id="tooltipBadge"></span>
+                            </div>
+                            <div class="tooltip-body">
+                                <div><strong>ID:</strong> <span id="tooltipId"></span></div>
+                                <div><strong>Координаты:</strong> <span id="tooltipCoords"></span></div>
+                                <div><strong>Длина:</strong> <span id="tooltipLength"></span></div>
+                                <div><strong>Угол:</strong> <span id="tooltipAngle"></span></div>
+                                <div><strong>Файл:</strong> <span id="tooltipFile"></span></div>
+                                <div><strong>Смысл чанка:</strong> <span id="tooltipVector"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-2 bg-light">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="small mb-1">Управление</h6>
+                            <ul class="list-unstyled small mb-0">
+                                <li><i class="fas fa-mouse-pointer me-1"></i> Перетаскивание для панорамирования</li>
+                                <li><i class="fas fa-mouse me-1"></i> Колесо мыши для масштабирования</li>
+                                <li><i class="fas fa-hand-pointer me-1"></i> Наведение для подсказки</li>
+                                <li><i class="fas fa-hand-pointer me-1"></i> Клик по стрелке для деталей</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="small mb-1">Легенда</h6>
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge bg-primary">Workflow</span>
+                                <span class="badge bg-success">Form</span>
+                                <span class="badge bg-warning">Grid</span>
+                                <span class="badge bg-info">Page</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для деталей вектора -->
+<div class="modal fade" id="vectorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-vector-square me-2"></i>Детали вектора
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="vectorDetails">
+                    <!-- Детали будут загружены через JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let vectors = [];
+let canvas, ctx;
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let isPanning = false;
+let lastPanX = 0;
+let lastPanY = 0;
+let selectedVector = null;
+let tooltip = null;
+let hoveredVector = null;
+
+// Цвета для разных типов схем
+const schemaColors = {
+    'workflow': '#0d6efd',
+    'form': '#198754',
+    'grid': '#ffc107',
+    'page': '#0dcaf0',
+    'default': '#6c757d'
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    canvas = document.getElementById('vectorCanvas');
+    ctx = canvas.getContext('2d');
+    tooltip = document.getElementById('vectorTooltip');
+    
+    // Устанавливаем размер canvas
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Добавляем обработчики для tooltip
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseleave', hideTooltip);
+    
+    loadVectors();
+});
+
+function resizeCanvas() {
+    const container = document.getElementById('canvas-container');
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = 500;
+    drawVectors();
+}
+
+async function loadVectors() {
+    showLoading('loading');
+    
+    try {
+        const schemaFilter = document.getElementById('schemaFilter').value;
+        const url = `/api/vectors?limit=200${schemaFilter ? '&schema=' + schemaFilter : ''}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        hideLoading('loading');
+        
+        if (data.error) {
+            showAlert(data.error, 'danger');
+            return;
+        }
+        
+        vectors = data.vectors;
+        document.getElementById('vectorCount').textContent = `${vectors.length} векторов`;
+        
+        // Нормализуем координаты для отображения
+        normalizeVectors();
+        
+        // Сбрасываем вид
+        resetView();
+        
+        drawVectors();
+    } catch (error) {
+        hideLoading('loading');
+        console.error('Ошибка загрузки векторов:', error);
+        showAlert('Ошибка загрузки векторов: ' + error.message, 'danger');
+    }
+}
+
+function normalizeVectors() {
+    if (vectors.length === 0) return;
+    
+    // Находим границы
+    let minX = Math.min(...vectors.map(v => v.x));
+    let maxX = Math.max(...vectors.map(v => v.x));
+    let minY = Math.min(...vectors.map(v => v.y));
+    let maxY = Math.max(...vectors.map(v => v.y));
+    
+    // Добавляем отступы
+    const padding = 0.1;
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+    minX -= rangeX * padding;
+    maxX += rangeX * padding;
+    minY -= rangeY * padding;
+    maxY += rangeY * padding;
+    
+    // Нормализуем к координатам canvas
+    const canvasWidth = canvas.width - 100; // Отступы
+    const canvasHeight = canvas.height - 100;
+    
+    vectors.forEach(vector => {
+        vector.normalizedX = ((vector.x - minX) / (maxX - minX)) * canvasWidth + 50;
+        vector.normalizedY = ((vector.y - minY) / (maxY - minY)) * canvasHeight + 50;
+    });
+}
+
+function drawVectors() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Применяем трансформации
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+    
+    // Рисуем сетку
+    drawGrid();
+    
+    // Рисуем векторы
+    vectors.forEach((vector, index) => {
+        drawVector(vector, index);
+    });
+    
+    ctx.restore();
+}
+
+function drawGrid() {
+    ctx.strokeStyle = '#e9ecef';
+    ctx.lineWidth = 0.5;
+    
+    const gridSize = 50;
+    const startX = -offsetX / scale;
+    const startY = -offsetY / scale;
+    const endX = (canvas.width - offsetX) / scale;
+    const endY = (canvas.height - offsetY) / scale;
+    
+    // Вертикальные линии
+    for (let x = Math.floor(startX / gridSize) * gridSize; x <= endX; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+        ctx.stroke();
+    }
+    
+    // Горизонтальные линии
+    for (let y = Math.floor(startY / gridSize) * gridSize; y <= endY; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+        ctx.stroke();
+    }
+}
+
+function drawVector(vector, index) {
+    const x = vector.normalizedX;
+    const y = vector.normalizedY;
+    const schema = vector.metadata?.schema || 'default';
+    const color = schemaColors[schema] || schemaColors.default;
+    
+    // Вычисляем длину и направление вектора
+    const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+    const angle = Math.atan2(vector.y, vector.x);
+    
+    // Масштабируем длину стрелки
+    const arrowLength = Math.min(Math.max(magnitude * 20, 10), 50);
+    
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    
+    // Рисуем стрелку
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    
+    // Линия стрелки
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(arrowLength, 0);
+    ctx.stroke();
+    
+    // Наконечник стрелки
+    const headLength = 8;
+    const headAngle = Math.PI / 6;
+    
+    ctx.beginPath();
+    ctx.moveTo(arrowLength, 0);
+    ctx.lineTo(arrowLength - headLength * Math.cos(headAngle), -headLength * Math.sin(headAngle));
+    ctx.moveTo(arrowLength, 0);
+    ctx.lineTo(arrowLength - headLength * Math.cos(headAngle), headLength * Math.sin(headAngle));
+    ctx.stroke();
+    
+    // Точка в начале вектора
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    ctx.restore();
+    
+    // Сохраняем данные для проверки наведения
+    vector.hitRadius = 15;
+    vector.arrowLength = arrowLength;
+    vector.angle = angle;
+}
+
+function showVectorDetails(vector) {
+    const details = document.getElementById('vectorDetails');
+    const metadata = vector.metadata || {};
+    
+    details.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Координаты</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>X:</strong></td><td>${vector.x.toFixed(4)}</td></tr>
+                    <tr><td><strong>Y:</strong></td><td>${vector.y.toFixed(4)}</td></tr>
+                    <tr><td><strong>Длина:</strong></td><td>${Math.sqrt(vector.x * vector.x + vector.y * vector.y).toFixed(4)}</td></tr>
+                    <tr><td><strong>Угол:</strong></td><td>${(Math.atan2(vector.y, vector.x) * 180 / Math.PI).toFixed(2)}°</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Метаданные</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>ID:</strong></td><td><code>${vector.id}</code></td></tr>
+                    <tr><td><strong>Схема:</strong></td><td><span class="badge bg-primary">${metadata.schema || 'Неизвестно'}</span></td></tr>
+                    <tr><td><strong>Секция:</strong></td><td>${metadata.section || 'Неизвестно'}</td></tr>
+                    <tr><td><strong>Файл:</strong></td><td>${metadata.path ? metadata.path.split('/').pop() : 'Неизвестно'}</td></tr>
+                </table>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>Предварительный просмотр документа</h6>
+                <div class="bg-light p-3 rounded">
+                    <pre class="mb-0 small">${escapeHtml(vector.document_preview)}</pre>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('vectorModal'));
+    modal.show();
+}
+
+// Управление панорамированием
+function startPan(event) {
+    isPanning = true;
+    lastPanX = event.clientX;
+    lastPanY = event.clientY;
+    canvas.style.cursor = 'grabbing';
+}
+
+function pan(event) {
+    if (!isPanning) return;
+    
+    const deltaX = event.clientX - lastPanX;
+    const deltaY = event.clientY - lastPanY;
+    
+    offsetX += deltaX;
+    offsetY += deltaY;
+    
+    lastPanX = event.clientX;
+    lastPanY = event.clientY;
+    
+    // Скрываем tooltip при панорамировании
+    hideTooltip();
+    
+    drawVectors();
+}
+
+function endPan(event) {
+    isPanning = false;
+    canvas.style.cursor = 'grab';
+}
+
+// Управление масштабированием
+function handleWheel(event) {
+    event.preventDefault();
+    
+    const zoomFactor = 0.1;
+    const mouseX = event.clientX - canvas.getBoundingClientRect().left;
+    const mouseY = event.clientY - canvas.getBoundingClientRect().top;
+    
+    const oldScale = scale;
+    scale += event.deltaY > 0 ? -zoomFactor : zoomFactor;
+    scale = Math.max(0.1, Math.min(5, scale));
+    
+    // Масштабируем относительно позиции мыши
+    offsetX = mouseX - (mouseX - offsetX) * (scale / oldScale);
+    offsetY = mouseY - (mouseY - offsetY) * (scale / oldScale);
+    
+    // Скрываем tooltip при масштабировании
+    hideTooltip();
+    
+    drawVectors();
+}
+
+function zoomIn() {
+    scale = Math.min(5, scale * 1.2);
+    drawVectors();
+}
+
+function zoomOut() {
+    scale = Math.max(0.1, scale / 1.2);
+    drawVectors();
+}
+
+function resetView() {
+    scale = 1;
+    offsetX = 0;
+    offsetY = 0;
+    drawVectors();
+}
+
+function handleMouseMove(event) {
+    if (isPanning) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = (event.clientX - rect.left - offsetX) / scale;
+    const mouseY = (event.clientY - rect.top - offsetY) / scale;
+    
+    // Проверяем, наведена ли мышь на какой-либо вектор
+    let foundVector = null;
+    for (const vector of vectors) {
+        const distance = Math.sqrt((mouseX - vector.normalizedX) ** 2 + (mouseY - vector.normalizedY) ** 2);
+        if (distance < vector.hitRadius) {
+            foundVector = vector;
+            break;
+        }
+    }
+    
+    if (foundVector && foundVector !== hoveredVector) {
+        hoveredVector = foundVector;
+        showTooltip(foundVector, event.clientX, event.clientY);
+        canvas.style.cursor = 'pointer';
+    } else if (!foundVector && hoveredVector) {
+        hoveredVector = null;
+        hideTooltip();
+        canvas.style.cursor = 'grab';
+    } else if (foundVector) {
+        // Обновляем позицию tooltip
+        updateTooltipPosition(event.clientX, event.clientY);
+    }
+}
+
+function showTooltip(vector, mouseX, mouseY) {
+    const metadata = vector.metadata || {};
+    const schema = metadata.schema || 'default';
+    const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+    const angle = Math.atan2(vector.y, vector.x) * 180 / Math.PI;
+    
+    // Заполняем данные tooltip
+    document.getElementById('tooltipSchema').textContent = schema.toUpperCase();
+    document.getElementById('tooltipBadge').textContent = schema;
+    document.getElementById('tooltipBadge').className = `badge tooltip-badge bg-${getSchemaBadgeClass(schema)}`;
+    document.getElementById('tooltipId').textContent = vector.id.substring(0, 8) + '...';
+    document.getElementById('tooltipCoords').textContent = `(${vector.x.toFixed(2)}, ${vector.y.toFixed(2)})`;
+    document.getElementById('tooltipLength').textContent = magnitude.toFixed(3);
+    document.getElementById('tooltipAngle').textContent = `${angle.toFixed(1)}°`;
+    document.getElementById('tooltipFile').textContent = metadata.path ? metadata.path.split('/').pop() : 'Неизвестно';
+    
+    // Показываем смысл чанка
+    if (vector.document_preview) {
+        const chunkMeaning = interpretChunk(vector.document_preview, vector.metadata);
+        document.getElementById('tooltipVector').textContent = chunkMeaning;
+    } else {
+        document.getElementById('tooltipVector').textContent = 'Содержимое недоступно';
+    }
+    
+    // Показываем tooltip
+    tooltip.style.display = 'block';
+    updateTooltipPosition(mouseX, mouseY);
+}
+
+function updateTooltipPosition(mouseX, mouseY) {
+    const rect = canvas.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    let x = mouseX + 10;
+    let y = mouseY - tooltipRect.height - 10;
+    
+    // Проверяем, не выходит ли tooltip за границы экрана
+    if (x + tooltipRect.width > window.innerWidth) {
+        x = mouseX - tooltipRect.width - 10;
+    }
+    if (y < 0) {
+        y = mouseY + 10;
+    }
+    
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+}
+
+function hideTooltip() {
+    tooltip.style.display = 'none';
+    hoveredVector = null;
+}
+
+function getSchemaBadgeClass(schema) {
+    const classes = {
+        'workflow': 'primary',
+        'form': 'success',
+        'grid': 'warning',
+        'page': 'info',
+        'default': 'secondary'
+    };
+    return classes[schema] || 'secondary';
+}
+
+function interpretChunk(content, metadata) {
+    // Анализируем содержимое чанка и создаем смысловое описание
+    const schema = metadata?.schema || 'unknown';
+    const path = metadata?.path || '';
+    
+    // Извлекаем ключевые слова и фразы
+    const keywords = extractKeywords(content);
+    const topic = identifyTopic(content, schema);
+    const purpose = identifyPurpose(content, schema);
+    
+    // Создаем описание
+    let description = [];
+    
+    // Тип контента
+    if (schema === 'workflow') {
+        description.push("🔧 Рабочий процесс");
+    } else if (schema === 'form') {
+        description.push("📝 Форма");
+    } else if (schema === 'grid') {
+        description.push("📊 Сетка данных");
+    } else if (schema === 'page') {
+        description.push("📄 Страница");
+    } else {
+        description.push("📋 Документ");
+    }
+    
+    // Тема
+    if (topic) {
+        description.push(`"${topic}"`);
+    }
+    
+    // Назначение
+    if (purpose) {
+        description.push(`(${purpose})`);
+    }
+    
+    // Ключевые слова (первые 3)
+    if (keywords.length > 0) {
+        const keyWords = keywords.slice(0, 3).join(", ");
+        description.push(`Ключевые слова: ${keyWords}`);
+    }
+    
+    return description.join(" ");
+}
+
+function extractKeywords(content) {
+    // Простое извлечение ключевых слов
+    const words = content.toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(word => word.length > 3)
+        .filter(word => !isStopWord(word));
+    
+    // Подсчитываем частоту
+    const wordCount = {};
+    words.forEach(word => {
+        wordCount[word] = (wordCount[word] || 0) + 1;
+    });
+    
+    // Сортируем по частоте
+    return Object.entries(wordCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([word]) => word);
+}
+
+function isStopWord(word) {
+    const stopWords = [
+        'this', 'that', 'with', 'have', 'will', 'from', 'they', 'been', 'were', 'said',
+        'each', 'which', 'their', 'time', 'would', 'there', 'could', 'other', 'after',
+        'first', 'well', 'also', 'new', 'because', 'any', 'these', 'give', 'day', 'most',
+        'это', 'что', 'для', 'или', 'как', 'его', 'ее', 'их', 'быть', 'иметь', 'был',
+        'была', 'было', 'были', 'который', 'которая', 'которое', 'которые', 'может',
+        'должен', 'нужно', 'можно', 'когда', 'где', 'почему', 'какой', 'какая', 'какое'
+    ];
+    return stopWords.includes(word);
+}
+
+function identifyTopic(content, schema) {
+    // Определяем тему на основе содержимого и схемы
+    const lowerContent = content.toLowerCase();
+    
+    if (schema === 'workflow') {
+        if (lowerContent.includes('создание') || lowerContent.includes('создать')) return 'Создание процессов';
+        if (lowerContent.includes('настройка') || lowerContent.includes('конфигурация')) return 'Настройка системы';
+        if (lowerContent.includes('выполнение') || lowerContent.includes('запуск')) return 'Выполнение задач';
+        if (lowerContent.includes('обработка') || lowerContent.includes('процесс')) return 'Обработка данных';
+    } else if (schema === 'form') {
+        if (lowerContent.includes('поле') || lowerContent.includes('ввод')) return 'Поля ввода';
+        if (lowerContent.includes('валидация') || lowerContent.includes('проверка')) return 'Валидация данных';
+        if (lowerContent.includes('отправка') || lowerContent.includes('submit')) return 'Отправка формы';
+    } else if (schema === 'grid') {
+        if (lowerContent.includes('столбец') || lowerContent.includes('колонка')) return 'Структура данных';
+        if (lowerContent.includes('сортировка') || lowerContent.includes('фильтр')) return 'Управление данными';
+        if (lowerContent.includes('отображение') || lowerContent.includes('показ')) return 'Отображение данных';
+    } else if (schema === 'page') {
+        if (lowerContent.includes('навигация') || lowerContent.includes('меню')) return 'Навигация';
+        if (lowerContent.includes('контент') || lowerContent.includes('содержимое')) return 'Контент страницы';
+        if (lowerContent.includes('макет') || lowerContent.includes('layout')) return 'Макет страницы';
+    }
+    
+    // Общие темы
+    if (lowerContent.includes('api') || lowerContent.includes('интерфейс')) return 'API и интерфейсы';
+    if (lowerContent.includes('база данных') || lowerContent.includes('database')) return 'База данных';
+    if (lowerContent.includes('пользователь') || lowerContent.includes('user')) return 'Пользовательский интерфейс';
+    if (lowerContent.includes('безопасность') || lowerContent.includes('security')) return 'Безопасность';
+    if (lowerContent.includes('производительность') || lowerContent.includes('performance')) return 'Производительность';
+    
+    return null;
+}
+
+function identifyPurpose(content, schema) {
+    // Определяем назначение контента
+    const lowerContent = content.toLowerCase();
+    
+    if (lowerContent.includes('руководство') || lowerContent.includes('guide')) return 'руководство';
+    if (lowerContent.includes('пример') || lowerContent.includes('example')) return 'пример использования';
+    if (lowerContent.includes('описание') || lowerContent.includes('description')) return 'описание';
+    if (lowerContent.includes('настройка') || lowerContent.includes('configuration')) return 'настройка';
+    if (lowerContent.includes('требование') || lowerContent.includes('requirement')) return 'требования';
+    if (lowerContent.includes('ограничение') || lowerContent.includes('limitation')) return 'ограничения';
+    if (lowerContent.includes('ошибка') || lowerContent.includes('error')) return 'обработка ошибок';
+    if (lowerContent.includes('тест') || lowerContent.includes('test')) return 'тестирование';
+    
+    return 'документация';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

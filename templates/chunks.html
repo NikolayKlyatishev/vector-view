@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Чанки - BMK RAG Interface{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>
+                <i class="fas fa-file-alt me-2"></i>Чанки документов
+            </h4>
+            <div class="d-flex gap-1">
+                <select class="form-select form-select-sm" id="perPageSelect" onchange="changePerPage()" style="width: auto;">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" onclick="refreshChunks()">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div id="loading" class="loading text-center py-4">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Загрузка чанков...</p>
+        </div>
+        
+        <div id="chunks-container">
+            <!-- Чанки будут загружены через JavaScript -->
+        </div>
+        
+        <nav id="pagination-container" class="mt-4">
+            <!-- Пагинация будет загружена через JavaScript -->
+        </nav>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let currentPerPage = 20;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadChunks();
+});
+
+async function loadChunks(page = 1, perPage = 20) {
+    showLoading('loading');
+    
+    try {
+        const response = await fetch(`/api/chunks?page=${page}&per_page=${perPage}`);
+        const data = await response.json();
+        
+        hideLoading('loading');
+        
+        if (data.error) {
+            showAlert(data.error, 'danger');
+            return;
+        }
+        
+        currentPage = page;
+        currentPerPage = perPage;
+        
+        displayChunks(data.chunks);
+        displayPagination(data.page, data.total_pages, data.total_count);
+    } catch (error) {
+        hideLoading('loading');
+        console.error('Ошибка загрузки чанков:', error);
+        showAlert('Ошибка загрузки чанков: ' + error.message, 'danger');
+    }
+}
+
+function displayChunks(chunks) {
+    const container = document.getElementById('chunks-container');
+    
+    if (chunks.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Чанки не найдены.
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    chunks.forEach((chunk, index) => {
+        const metadata = chunk.metadata || {};
+        const schema = metadata.schema || 'Неизвестно';
+        const section = metadata.section || 'Неизвестно';
+        const path = metadata.path || 'Неизвестно';
+        const jsonPointer = metadata.json_pointer || '';
+        
+        // Обрезаем длинный контент для предварительного просмотра
+        const previewLength = 300;
+        const fullContent = chunk.document;
+        const isLong = fullContent.length > previewLength;
+        const previewContent = isLong ? fullContent.substring(0, previewLength) + '...' : fullContent;
+        
+        html += `
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">
+                            <i class="fas fa-file-alt me-1"></i>
+                            Чанк #${(currentPage - 1) * currentPerPage + index + 1}
+                        </h6>
+                        <small class="text-muted">ID: ${chunk.id}</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <span class="badge bg-primary">${schema}</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleChunkContent(${index})">
+                            <i class="fas fa-eye me-1"></i>Показать
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Схема:</strong> ${schema}<br>
+                            <strong>Секция:</strong> ${section}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Файл:</strong> ${path.split('/').pop()}<br>
+                            ${jsonPointer ? `<strong>Указатель:</strong> ${jsonPointer}` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="chunk-content" id="chunk-content-${index}" style="display: none;">
+                        <pre class="mb-0">${escapeHtml(fullContent)}</pre>
+                    </div>
+                    
+                    <div class="chunk-preview" id="chunk-preview-${index}">
+                        <pre class="mb-0">${escapeHtml(previewContent)}</pre>
+                        ${isLong ? '<p class="text-muted small mt-2">Нажмите "Показать" для полного содержимого</p>' : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function displayPagination(page, totalPages, totalCount) {
+    const container = document.getElementById('pagination-container');
+    
+    if (totalPages <= 1) {
+        container.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted">Всего чанков: ${totalCount.toLocaleString()}</span>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="text-muted">Всего чанков: ${totalCount.toLocaleString()}</span>
+            <ul class="pagination mb-0">
+    `;
+    
+    // Предыдущая страница
+    if (page > 1) {
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="loadChunks(${page - 1}, ${currentPerPage})">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+        `;
+    }
+    
+    // Номера страниц
+    const startPage = Math.max(1, page - 2);
+    const endPage = Math.min(totalPages, page + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === page;
+        html += `
+            <li class="page-item ${isActive ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadChunks(${i}, ${currentPerPage})">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Следующая страница
+    if (page < totalPages) {
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="loadChunks(${page + 1}, ${currentPerPage})">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+        `;
+    }
+    
+    html += `
+            </ul>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function toggleChunkContent(index) {
+    const contentDiv = document.getElementById(`chunk-content-${index}`);
+    const previewDiv = document.getElementById(`chunk-preview-${index}`);
+    const button = event.target.closest('button');
+    
+    if (contentDiv.style.display === 'none') {
+        contentDiv.style.display = 'block';
+        previewDiv.style.display = 'none';
+        button.innerHTML = '<i class="fas fa-eye-slash me-1"></i>Скрыть';
+    } else {
+        contentDiv.style.display = 'none';
+        previewDiv.style.display = 'block';
+        button.innerHTML = '<i class="fas fa-eye me-1"></i>Показать';
+    }
+}
+
+function changePerPage() {
+    const perPage = parseInt(document.getElementById('perPageSelect').value);
+    loadChunks(1, perPage);
+}
+
+function refreshChunks() {
+    loadChunks(currentPage, currentPerPage);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}
