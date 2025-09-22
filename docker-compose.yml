@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  vector-view:
+    build: .
+    ports:
+      - "5001:5001"
+    volumes:
+      # Монтируем папку с данными ChromaDB
+      - ./data:/app/data
+      # Монтируем конфигурационный файл (опционально)
+      - ./.env:/app/.env:ro
+    environment:
+      - FLASK_APP=run_web.py
+      - FLASK_ENV=production
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5001
+      - CHROMA_DB_PATH=/app/data/.chroma
+      - COLLECTION_NAME=usage-guides
+      - EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Опциональный сервис для разработки с hot reload
+  vector-view-dev:
+    build: .
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./src:/app/src
+      - ./templates:/app/templates
+      - ./run_web.py:/app/run_web.py
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - FLASK_APP=run_web.py
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5001
+      - CHROMA_DB_PATH=/app/data/.chroma
+      - COLLECTION_NAME=usage-guides
+      - EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    command: ["python", "run_web.py"]
+    profiles:
+      - dev

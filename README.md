@@ -25,36 +25,67 @@ A modern web interface for visualizing and interacting with vector databases in 
 
 ### Installation
 
+#### Option 1: Using Poetry (Recommended)
+
 1. **Clone the repository**
    ```bash
    git clone https://github.com/your-username/vector-view.git
    cd vector-view
    ```
 
-2. **Create a virtual environment**
+2. **Install and run**
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   poetry install
+   poetry run vector-view
    ```
 
-3. **Install dependencies**
+#### Option 2: Using Make
+
+1. **Clone the repository**
    ```bash
-   pip install -r requirements.txt
-   # or use the Makefile
+   git clone https://github.com/your-username/vector-view.git
+   cd vector-view
+   ```
+
+2. **Install and run**
+   ```bash
    make install
+   make web
    ```
 
-4. **Run the application**
+#### Option 3: Using installation script
+
+1. **Clone and run installation script**
+   ```bash
+   git clone https://github.com/your-username/vector-view.git
+   cd vector-view
+   chmod +x scripts/install.sh
+   ./scripts/install.sh
+   ```
+
+2. **Run the application**
    ```bash
    make web
-   # or
-   python run_web.py
    ```
 
-5. **Open your browser**
+#### Option 4: Using Docker
+
+1. **Clone and run with Docker**
+   ```bash
+   git clone https://github.com/your-username/vector-view.git
+   cd vector-view
+   make docker-run
    ```
-   http://localhost:5001
+
+2. **For development with hot reload**
+   ```bash
+   make docker-dev
    ```
+
+### Open your browser
+```
+http://localhost:5001
+```
 
 ## 📖 Usage
 
@@ -93,34 +124,65 @@ CHROMA_DB_PATH=/data/chroma COLLECTION_NAME=docs FLASK_PORT=3000 make web
 
 ```
 vector-view/
-├── app.py                 # Main Flask application
-├── run_web.py            # Application runner
-├── config.py             # Configuration management
-├── test_web.py           # Tests
-├── requirements.txt      # Python dependencies
-├── pyproject.toml        # Project metadata
-├── Makefile              # Build commands
-├── README.md             # Project documentation
-├── LICENSE               # MIT License
-├── CONTRIBUTING.md       # Contributing guidelines
-└── templates/            # HTML templates
-    ├── base.html         # Base template
-    ├── index.html        # Home page
-    ├── settings.html     # Settings page
-    ├── collections.html  # Collections page
-    ├── chunks.html       # Chunks page
-    ├── search.html       # Search page
-    └── vectors.html      # Vectors visualization
+├── src/vector_view/      # Main package
+│   ├── __init__.py       # Package initialization
+│   ├── app.py           # Flask application factory
+│   ├── config.py        # Configuration management
+│   ├── database.py      # Database operations
+│   ├── routes.py        # Flask routes and API endpoints
+│   └── templates/       # HTML templates
+│       ├── base.html    # Base template
+│       ├── index.html   # Home page
+│       ├── settings.html # Settings page
+│       ├── collections.html # Collections page
+│       ├── chunks.html  # Chunks page
+│       ├── search.html  # Search page
+│       └── vectors.html # Vectors visualization
+├── tests/               # Test suite
+│   ├── __init__.py
+│   └── test_web.py
+├── scripts/             # Installation and deployment scripts
+│   ├── install.sh       # Installation script
+│   └── setup-dev.sh     # Development setup script
+├── pyproject.toml      # Poetry project configuration
+├── poetry.lock         # Poetry lock file
+├── Makefile           # Build and development commands
+├── Dockerfile         # Docker configuration
+├── docker-compose.yml # Docker Compose configuration
+├── .gitignore         # Git ignore rules
+├── .dockerignore      # Docker ignore rules
+├── README.md          # Project documentation
+├── CHANGELOG.md       # Changelog
+├── LICENSE            # MIT License
+└── CONTRIBUTING.md    # Contributing guidelines
 ```
 
 ### Available Commands
 
 ```bash
+# Development
 make help          # Show available commands
-make install       # Install dependencies
+make dev           # Setup development environment
 make web           # Run web interface
 make test          # Run tests
-make clean         # Clean virtual environment
+make lint          # Check code with linters
+make format        # Format code
+
+# Installation
+make install       # Install package in development mode
+make build         # Build package
+make dist          # Create distribution
+
+# Docker
+make docker-build  # Build Docker image
+make docker-run    # Run with Docker Compose
+make docker-dev    # Run in development mode
+make docker-stop   # Stop containers
+make docker-clean  # Clean Docker resources
+
+# Maintenance
+make clean         # Clean temporary files
+make clean-all     # Full cleanup including data
 ```
 
 ### API Endpoints
