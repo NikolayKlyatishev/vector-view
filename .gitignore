@@ -160,7 +160,11 @@ Desktop.ini
 *.log
 logs/
 temp/
-tmp/
+tmp
+
+# Configuration files (now stored in /tmp/vector-view/)
+connections.json
+user_settings.json
 
 # Poetry
 # poetry.lock  # Закомментировано - lock файл нужен для воспроизводимости

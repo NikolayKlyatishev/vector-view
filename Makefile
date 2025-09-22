@@ -2,7 +2,7 @@
 POETRY = poetry
 
 ## Доступные цели
-.PHONY: help install dev web test clean build dist lint format docker-build docker-run docker-stop docker-clean
+.PHONY: help install dev web stop test clean build dist lint format docker-build docker-run docker-stop docker-clean
 
 ## Цель по умолчанию — показать справку
 .DEFAULT_GOAL := help
@@ -28,6 +28,11 @@ web-custom: install ## Запустить веб-интерфейс с каст�
 	@echo "  FLASK_PORT=8080 make web-custom"
 	@echo ""
 	$(POETRY) run vector-view
+
+stop: ## Остановить запущенное приложение
+	@echo "Остановка приложения..."
+	@pkill -f "vector-view" || echo "Процесс не найден"
+	@echo "✅ Приложение остановлено"
 
 test: install ## Тестировать веб-интерфейс
 	$(POETRY) run pytest

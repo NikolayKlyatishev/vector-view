@@ -15,6 +15,7 @@ A modern web interface for visualizing and interacting with vector databases in 
 - **⚙️ Settings Management**: Easy configuration through web interface
 - **📁 Folder Picker**: Modern folder selection using File System Access API
 - **🌐 Multi-language Support**: Built-in support for multilingual embeddings
+- **💾 Configuration Storage**: Settings stored in `/tmp/vector-view/` for easy access
 
 ## 🚀 Quick Start
 
@@ -183,6 +184,26 @@ make docker-clean  # Clean Docker resources
 # Maintenance
 make clean         # Clean temporary files
 make clean-all     # Full cleanup including data
+```
+
+### Configuration Files
+
+Vector View stores its configuration files in `/tmp/vector-view/`:
+
+- **`connections.json`** - Database connections and settings
+- **`user_settings.json`** - User preferences and recent paths
+
+You can view or edit these files directly:
+
+```bash
+# View connections
+cat /tmp/vector-view/connections.json
+
+# View user settings  
+cat /tmp/vector-view/user_settings.json
+
+# Edit connections (use your preferred editor)
+nano /tmp/vector-view/connections.json
 ```
 
 ### API Endpoints

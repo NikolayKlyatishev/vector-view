@@ -25,24 +25,17 @@ def create_app():
 
 def init_app():
     """Инициализация приложения."""
-    # Проверяем конфигурацию
-    if not Config.validate_config():
-        print("Конфигурация не прошла проверку. Продолжаем с предупреждениями...")
+    from pathlib import Path
 
-    # Получаем настройки из конфигурации
-    db_path = Config.get_chroma_path()
-    collection_name = Config.COLLECTION_NAME
-    model_name = Config.EMBEDDING_MODEL
-
-    try:
-        db_manager.load_chroma_collection(db_path, collection_name)
-        db_manager.load_embedding_model(model_name)
-        print(f"Приложение инициализировано.")
-        print(f"  База данных: {db_path}")
-        print(f"  Коллекция: {collection_name}")
-        print(f"  Модель: {model_name}")
-    except Exception as e:
-        print(f"Ошибка инициализации: {e}")
+    print("🚀 Запуск Vector View...")
+    print("   Приложение готово к работе")
+    print("   Для подключения к базе данных используйте раздел 'Подключения'")
+    print("   URL: http://localhost:5001/connections")
+    print()
+    print("📁 Файлы конфигурации:")
+    print(f"   • Подключения: /tmp/vector-view/connections.json")
+    print(f"   • Настройки: /tmp/vector-view/user_settings.json")
+    print()
 
 
 # Create the Flask app

@@ -93,11 +93,8 @@
                         </div>
                         <div class="col-md-6">
                             <h6 class="small mb-1">Легенда</h6>
-                            <div class="d-flex flex-wrap gap-1">
-                                <span class="badge bg-primary">Workflow</span>
-                                <span class="badge bg-success">Form</span>
-                                <span class="badge bg-warning">Grid</span>
-                                <span class="badge bg-info">Page</span>
+                            <div id="legend" class="d-flex flex-wrap gap-1">
+                                <!-- Легенда будет загружена динамически -->
                             </div>
                         </div>
                     </div>
@@ -144,14 +141,7 @@ let selectedVector = null;
 let tooltip = null;
 let hoveredVector = null;
 
-// Цвета для разных типов схем
-const schemaColors = {
-    'workflow': '#0d6efd',
-    'form': '#198754',
-    'grid': '#ffc107',
-    'page': '#0dcaf0',
-    'default': '#6c757d'
-};
+// Универсальная система цветов для категорий
 
 document.addEventListener('DOMContentLoaded', function() {
     canvas = document.getElementById('vectorCanvas');
@@ -202,6 +192,9 @@ async function loadVectors() {
         
         // Сбрасываем вид
         resetView();
+        
+        // Обновляем легенду
+        updateLegend();
         
         drawVectors();
     } catch (error) {
@@ -288,8 +281,8 @@ function drawGrid() {
 function drawVector(vector, index) {
     const x = vector.normalizedX;
     const y = vector.normalizedY;
-    const schema = vector.metadata?.schema || 'default';
-    const color = schemaColors[schema] || schemaColors.default;
+    const category = getVectorCategory(vector);
+    const color = getCategoryColor(category);
     
     // Вычисляем длину и направление вектора
     const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
@@ -479,14 +472,14 @@ function handleMouseMove(event) {
 
 function showTooltip(vector, mouseX, mouseY) {
     const metadata = vector.metadata || {};
-    const schema = metadata.schema || 'default';
+    const category = getVectorCategory(vector);
     const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
     const angle = Math.atan2(vector.y, vector.x) * 180 / Math.PI;
     
     // Заполняем данные tooltip
-    document.getElementById('tooltipSchema').textContent = schema.toUpperCase();
-    document.getElementById('tooltipBadge').textContent = schema;
-    document.getElementById('tooltipBadge').className = `badge tooltip-badge bg-${getSchemaBadgeClass(schema)}`;
+    document.getElementById('tooltipSchema').textContent = category.toUpperCase();
+    document.getElementById('tooltipBadge').textContent = category;
+    document.getElementById('tooltipBadge').className = `badge tooltip-badge bg-${getCategoryBadgeClass(category)}`;
     document.getElementById('tooltipId').textContent = vector.id.substring(0, 8) + '...';
     document.getElementById('tooltipCoords').textContent = `(${vector.x.toFixed(2)}, ${vector.y.toFixed(2)})`;
     document.getElementById('tooltipLength').textContent = magnitude.toFixed(3);
@@ -530,42 +523,22 @@ function hideTooltip() {
     hoveredVector = null;
 }
 
-function getSchemaBadgeClass(schema) {
-    const classes = {
-        'workflow': 'primary',
-        'form': 'success',
-        'grid': 'warning',
-        'page': 'info',
-        'default': 'secondary'
-    };
-    return classes[schema] || 'secondary';
-}
 
 function interpretChunk(content, metadata) {
     // Анализируем содержимое чанка и создаем смысловое описание
-    const schema = metadata?.schema || 'unknown';
     const path = metadata?.path || '';
     
     // Извлекаем ключевые слова и фразы
     const keywords = extractKeywords(content);
-    const topic = identifyTopic(content, schema);
-    const purpose = identifyPurpose(content, schema);
+    const topic = identifyTopic(content);
+    const purpose = identifyPurpose(content);
     
     // Создаем описание
     let description = [];
     
-    // Тип контента
-    if (schema === 'workflow') {
-        description.push("🔧 Рабочий процесс");
-    } else if (schema === 'form') {
-        description.push("📝 Форма");
-    } else if (schema === 'grid') {
-        description.push("📊 Сетка данных");
-    } else if (schema === 'page') {
-        description.push("📄 Страница");
-    } else {
-        description.push("📋 Документ");
-    }
+    // Тип контента на основе пути или содержимого
+    const contentType = identifyContentType(content, path);
+    description.push(contentType);
     
     // Тема
     if (topic) {
@@ -584,6 +557,41 @@ function interpretChunk(content, metadata) {
     }
     
     return description.join(" ");
+}
+
+function identifyContentType(content, path) {
+    const lowerContent = content.toLowerCase();
+    const lowerPath = path.toLowerCase();
+    
+    // Определяем тип по расширению файла
+    if (lowerPath.endsWith('.py') || lowerPath.endsWith('.js') || lowerPath.endsWith('.ts')) {
+        return "💻 Код";
+    } else if (lowerPath.endsWith('.md') || lowerPath.endsWith('.txt')) {
+        return "📄 Документация";
+    } else if (lowerPath.endsWith('.json') || lowerPath.endsWith('.yaml') || lowerPath.endsWith('.yml')) {
+        return "⚙️ Конфигурация";
+    } else if (lowerPath.endsWith('.html') || lowerPath.endsWith('.css')) {
+        return "🌐 Веб-интерфейс";
+    }
+    
+    // Определяем тип по содержимому
+    if (lowerContent.includes('function') || lowerContent.includes('def ') || lowerContent.includes('class ')) {
+        return "💻 Код";
+    } else if (lowerContent.includes('api') || lowerContent.includes('endpoint')) {
+        return "🔌 API";
+    } else if (lowerContent.includes('database') || lowerContent.includes('sql')) {
+        return "🗄️ База данных";
+    } else if (lowerContent.includes('config') || lowerContent.includes('setting')) {
+        return "⚙️ Конфигурация";
+    } else if (lowerContent.includes('test') || lowerContent.includes('spec')) {
+        return "🧪 Тесты";
+    } else if (lowerContent.includes('error') || lowerContent.includes('exception')) {
+        return "❌ Ошибки";
+    } else if (lowerContent.includes('user') || lowerContent.includes('пользователь')) {
+        return "👤 Пользовательский интерфейс";
+    }
+    
+    return "📋 Документ";
 }
 
 function extractKeywords(content) {
@@ -619,51 +627,55 @@ function isStopWord(word) {
     return stopWords.includes(word);
 }
 
-function identifyTopic(content, schema) {
-    // Определяем тему на основе содержимого и схемы
+function identifyTopic(content) {
+    // Определяем тему на основе содержимого
     const lowerContent = content.toLowerCase();
     
-    if (schema === 'workflow') {
-        if (lowerContent.includes('создание') || lowerContent.includes('создать')) return 'Создание процессов';
-        if (lowerContent.includes('настройка') || lowerContent.includes('конфигурация')) return 'Настройка системы';
-        if (lowerContent.includes('выполнение') || lowerContent.includes('запуск')) return 'Выполнение задач';
-        if (lowerContent.includes('обработка') || lowerContent.includes('процесс')) return 'Обработка данных';
-    } else if (schema === 'form') {
-        if (lowerContent.includes('поле') || lowerContent.includes('ввод')) return 'Поля ввода';
-        if (lowerContent.includes('валидация') || lowerContent.includes('проверка')) return 'Валидация данных';
-        if (lowerContent.includes('отправка') || lowerContent.includes('submit')) return 'Отправка формы';
-    } else if (schema === 'grid') {
-        if (lowerContent.includes('столбец') || lowerContent.includes('колонка')) return 'Структура данных';
-        if (lowerContent.includes('сортировка') || lowerContent.includes('фильтр')) return 'Управление данными';
-        if (lowerContent.includes('отображение') || lowerContent.includes('показ')) return 'Отображение данных';
-    } else if (schema === 'page') {
-        if (lowerContent.includes('навигация') || lowerContent.includes('меню')) return 'Навигация';
-        if (lowerContent.includes('контент') || lowerContent.includes('содержимое')) return 'Контент страницы';
-        if (lowerContent.includes('макет') || lowerContent.includes('layout')) return 'Макет страницы';
-    }
-    
-    // Общие темы
+    // Технические темы
     if (lowerContent.includes('api') || lowerContent.includes('интерфейс')) return 'API и интерфейсы';
-    if (lowerContent.includes('база данных') || lowerContent.includes('database')) return 'База данных';
-    if (lowerContent.includes('пользователь') || lowerContent.includes('user')) return 'Пользовательский интерфейс';
-    if (lowerContent.includes('безопасность') || lowerContent.includes('security')) return 'Безопасность';
-    if (lowerContent.includes('производительность') || lowerContent.includes('performance')) return 'Производительность';
+    if (lowerContent.includes('база данных') || lowerContent.includes('database') || lowerContent.includes('sql')) return 'База данных';
+    if (lowerContent.includes('пользователь') || lowerContent.includes('user') || lowerContent.includes('пользовательский')) return 'Пользовательский интерфейс';
+    if (lowerContent.includes('безопасность') || lowerContent.includes('security') || lowerContent.includes('аутентификация')) return 'Безопасность';
+    if (lowerContent.includes('производительность') || lowerContent.includes('performance') || lowerContent.includes('оптимизация')) return 'Производительность';
+    if (lowerContent.includes('тестирование') || lowerContent.includes('test') || lowerContent.includes('проверка')) return 'Тестирование';
+    if (lowerContent.includes('конфигурация') || lowerContent.includes('настройка') || lowerContent.includes('config')) return 'Конфигурация';
+    if (lowerContent.includes('ошибка') || lowerContent.includes('error') || lowerContent.includes('исключение')) return 'Обработка ошибок';
+    if (lowerContent.includes('авторизация') || lowerContent.includes('авторизация') || lowerContent.includes('permission')) return 'Авторизация';
+    if (lowerContent.includes('логирование') || lowerContent.includes('log') || lowerContent.includes('журнал')) return 'Логирование';
+    
+    // Бизнес-темы
+    if (lowerContent.includes('создание') || lowerContent.includes('создать') || lowerContent.includes('create')) return 'Создание объектов';
+    if (lowerContent.includes('обновление') || lowerContent.includes('изменение') || lowerContent.includes('update')) return 'Обновление данных';
+    if (lowerContent.includes('удаление') || lowerContent.includes('delete') || lowerContent.includes('удалить')) return 'Удаление данных';
+    if (lowerContent.includes('поиск') || lowerContent.includes('search') || lowerContent.includes('фильтр')) return 'Поиск и фильтрация';
+    if (lowerContent.includes('отчет') || lowerContent.includes('report') || lowerContent.includes('аналитика')) return 'Отчеты и аналитика';
+    if (lowerContent.includes('импорт') || lowerContent.includes('экспорт') || lowerContent.includes('import')) return 'Импорт/экспорт данных';
+    
+    // Процессные темы
+    if (lowerContent.includes('рабочий процесс') || lowerContent.includes('workflow') || lowerContent.includes('процесс')) return 'Рабочие процессы';
+    if (lowerContent.includes('форма') || lowerContent.includes('form') || lowerContent.includes('ввод данных')) return 'Формы и ввод данных';
+    if (lowerContent.includes('сетка') || lowerContent.includes('grid') || lowerContent.includes('таблица')) return 'Сетки и таблицы';
+    if (lowerContent.includes('страница') || lowerContent.includes('page') || lowerContent.includes('интерфейс')) return 'Страницы и интерфейсы';
     
     return null;
 }
 
-function identifyPurpose(content, schema) {
+function identifyPurpose(content) {
     // Определяем назначение контента
     const lowerContent = content.toLowerCase();
     
-    if (lowerContent.includes('руководство') || lowerContent.includes('guide')) return 'руководство';
-    if (lowerContent.includes('пример') || lowerContent.includes('example')) return 'пример использования';
-    if (lowerContent.includes('описание') || lowerContent.includes('description')) return 'описание';
-    if (lowerContent.includes('настройка') || lowerContent.includes('configuration')) return 'настройка';
-    if (lowerContent.includes('требование') || lowerContent.includes('requirement')) return 'требования';
-    if (lowerContent.includes('ограничение') || lowerContent.includes('limitation')) return 'ограничения';
-    if (lowerContent.includes('ошибка') || lowerContent.includes('error')) return 'обработка ошибок';
-    if (lowerContent.includes('тест') || lowerContent.includes('test')) return 'тестирование';
+    if (lowerContent.includes('руководство') || lowerContent.includes('guide') || lowerContent.includes('инструкция')) return 'руководство';
+    if (lowerContent.includes('пример') || lowerContent.includes('example') || lowerContent.includes('демонстрация')) return 'пример использования';
+    if (lowerContent.includes('описание') || lowerContent.includes('description') || lowerContent.includes('характеристика')) return 'описание';
+    if (lowerContent.includes('настройка') || lowerContent.includes('configuration') || lowerContent.includes('конфигурация')) return 'настройка';
+    if (lowerContent.includes('требование') || lowerContent.includes('requirement') || lowerContent.includes('спецификация')) return 'требования';
+    if (lowerContent.includes('ограничение') || lowerContent.includes('limitation') || lowerContent.includes('лимит')) return 'ограничения';
+    if (lowerContent.includes('ошибка') || lowerContent.includes('error') || lowerContent.includes('исключение')) return 'обработка ошибок';
+    if (lowerContent.includes('тест') || lowerContent.includes('test') || lowerContent.includes('проверка')) return 'тестирование';
+    if (lowerContent.includes('установка') || lowerContent.includes('install') || lowerContent.includes('развертывание')) return 'установка и развертывание';
+    if (lowerContent.includes('обновление') || lowerContent.includes('update') || lowerContent.includes('миграция')) return 'обновления и миграции';
+    if (lowerContent.includes('безопасность') || lowerContent.includes('security') || lowerContent.includes('защита')) return 'безопасность';
+    if (lowerContent.includes('производительность') || lowerContent.includes('performance') || lowerContent.includes('оптимизация')) return 'производительность';
     
     return 'документация';
 }
@@ -672,6 +684,83 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function updateLegend() {
+    const legendContainer = document.getElementById('legend');
+    
+    if (vectors.length === 0) {
+        legendContainer.innerHTML = '<span class="text-muted small">Нет данных для отображения</span>';
+        return;
+    }
+    
+    // Собираем уникальные категории из метаданных векторов
+    const categories = new Set();
+    vectors.forEach(vector => {
+        const metadata = vector.metadata || {};
+        // Ищем любые поля, которые могут служить категориями
+        Object.keys(metadata).forEach(key => {
+            if (key !== 'path' && key !== 'id' && metadata[key] && typeof metadata[key] === 'string') {
+                categories.add(metadata[key]);
+            }
+        });
+        // Если нет категорий в метаданных, используем 'default'
+        if (categories.size === 0) {
+            categories.add('default');
+        }
+    });
+    
+    // Если нет категорий, показываем общую информацию
+    if (categories.size === 0) {
+        legendContainer.innerHTML = `<span class="badge bg-secondary">Все векторы (${vectors.length})</span>`;
+        return;
+    }
+    
+    // Создаем бейджи для каждой категории
+    const legendItems = Array.from(categories).map(category => {
+        const count = vectors.filter(v => {
+            const metadata = v.metadata || {};
+            return Object.values(metadata).includes(category);
+        }).length;
+        const badgeClass = getCategoryBadgeClass(category);
+        
+        return `<span class="badge bg-${badgeClass}" title="${count} векторов">${category} (${count})</span>`;
+    });
+    
+    legendContainer.innerHTML = legendItems.join('');
+}
+
+function getCategoryBadgeClass(category) {
+    // Генерируем цвет на основе хеша строки для консистентности
+    const colors = ['primary', 'success', 'warning', 'info', 'danger', 'secondary', 'dark'];
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+        hash = ((hash << 5) - hash + category.charCodeAt(i)) & 0xffffffff;
+    }
+    return colors[Math.abs(hash) % colors.length];
+}
+
+function getVectorCategory(vector) {
+    const metadata = vector.metadata || {};
+    
+    // Ищем первое подходящее поле для категории
+    for (const [key, value] of Object.entries(metadata)) {
+        if (key !== 'path' && key !== 'id' && value && typeof value === 'string') {
+            return value;
+        }
+    }
+    
+    return 'default';
+}
+
+function getCategoryColor(category) {
+    // Генерируем цвет на основе хеша строки для консистентности
+    const colors = ['#0d6efd', '#198754', '#ffc107', '#0dcaf0', '#dc3545', '#6c757d', '#212529'];
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+        hash = ((hash << 5) - hash + category.charCodeAt(i)) & 0xffffffff;
+    }
+    return colors[Math.abs(hash) % colors.length];
 }
 </script>
 {% endblock %}

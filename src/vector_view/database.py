@@ -12,6 +12,8 @@ from typing import Optional
 import chromadb
 from sentence_transformers import SentenceTransformer
 
+from .connections import connection_manager
+
 
 class DatabaseManager:
     """Manages ChromaDB client and collections."""
@@ -20,17 +22,23 @@ class DatabaseManager:
         self.client: Optional[chromadb.PersistentClient] = None
         self.collection = None
         self.model: Optional[SentenceTransformer] = None
+        self.is_initialized = False
+        self.initialization_error: Optional[str] = None
 
     def load_chroma_collection(self, db_path: Path, collection_name: str):
         """Load Chroma collection from persistent storage."""
-        self.client = chromadb.PersistentClient(path=str(db_path))
         try:
+            self.client = chromadb.PersistentClient(path=str(db_path))
             self.collection = self.client.get_collection(collection_name)
+            self.is_initialized = True
+            self.initialization_error = None
             return self.collection
         except Exception as e:
-            raise RuntimeError(
+            self.is_initialized = False
+            self.initialization_error = (
                 f"Ошибка загрузки коллекции '{collection_name}': {e}"
-            ) from e
+            )
+            raise RuntimeError(self.initialization_error) from e
 
     def load_embedding_model(self, model_name: str):
         """Load sentence transformer model."""
@@ -38,12 +46,42 @@ class DatabaseManager:
             self.model = SentenceTransformer(model_name)
             return self.model
         except Exception as e:
-            raise RuntimeError(f"Ошибка загрузки модели '{model_name}': {e}") from e
+            self.is_initialized = False
+            self.initialization_error = f"Ошибка загрузки модели '{model_name}': {e}"
+            raise RuntimeError(self.initialization_error) from e
+
+    def is_db_available(self) -> bool:
+        """Check if database is available and initialized."""
+        return self.is_initialized and self.client is not None
+
+    def use_connection_manager(self) -> bool:
+        """Use connection manager instead of direct connection."""
+        if connection_manager.is_connected():
+            self.client = connection_manager.current_client
+            self.collection = connection_manager.current_collection
+            self.model = connection_manager.current_model
+            self.is_initialized = True
+            self.initialization_error = None
+            return True
+        return False
+
+    def get_status(self) -> dict:
+        """Get current database status."""
+        return {
+            "is_initialized": self.is_initialized,
+            "has_client": self.client is not None,
+            "has_collection": self.collection is not None,
+            "has_model": self.model is not None,
+            "error": self.initialization_error,
+        }
 
     def get_collections(self):
         """Get list of all collections."""
-        if not self.client:
-            raise RuntimeError("Chroma клиент не инициализирован")
+        # Try to use connection manager first
+        if not self.is_db_available() and not self.use_connection_manager():
+            raise RuntimeError(
+                f"База данных недоступна. {self.initialization_error or 'Не инициализирована'}"
+            )
 
         collections_list = self.client.list_collections()
         collections_data = []
@@ -62,8 +100,11 @@ class DatabaseManager:
 
     def get_chunks(self, page: int = 1, per_page: int = 20):
         """Get document chunks with pagination."""
-        if not self.collection:
-            raise RuntimeError("Коллекция не загружена")
+        # Try to use connection manager first
+        if not self.is_db_available() and not self.use_connection_manager():
+            raise RuntimeError(
+                f"База данных недоступна. {self.initialization_error or 'Не инициализирована'}"
+            )
 
         results = self.collection.get(
             limit=per_page,
@@ -96,8 +137,13 @@ class DatabaseManager:
         self, query_text: str, schema_filter: Optional[str] = None, top_k: int = 5
     ):
         """Perform semantic search."""
-        if not self.collection or not self.model:
-            raise RuntimeError("Коллекция или модель не загружены")
+        # Try to use connection manager first
+        if not self.is_db_available() and not self.use_connection_manager():
+            raise RuntimeError(
+                f"База данных недоступна. {self.initialization_error or 'Не инициализирована'}"
+            )
+        if not self.model:
+            raise RuntimeError("Модель эмбеддингов не загружена")
 
         if not query_text:
             raise ValueError("Запрос не может быть пустым")
@@ -138,8 +184,11 @@ class DatabaseManager:
 
     def get_vectors(self, limit: int = 100, schema_filter: Optional[str] = None):
         """Get vectors for visualization."""
-        if not self.collection:
-            raise RuntimeError("Коллекция не загружена")
+        # Try to use connection manager first
+        if not self.is_db_available() and not self.use_connection_manager():
+            raise RuntimeError(
+                f"База данных недоступна. {self.initialization_error or 'Не инициализирована'}"
+            )
 
         # Build where clause
         where = {}

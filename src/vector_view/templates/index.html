@@ -1,135 +1,158 @@
 {% extends "base.html" %}
 
-{% block title %}Главная - RAG Interface{% endblock %}
+{% block title %}Dashboard - Vector View{% endblock %}
 
 {% block content %}
-<div class="row">
+<!-- Welcome Section -->
+<div class="row mb-3">
     <div class="col-12">
-        <div class="jumbotron bg-light p-3 rounded">
-            <h1 class="h3">
-                <i class="fas fa-robot text-primary me-2"></i>
-                RAG Interface
-            </h1>
-            <p class="mb-2">
-                Веб-интерфейс для работы с системой поиска по документам и схемам.
-            </p>
-            <p class="small text-muted mb-0">
-                Семантический поиск по документам с поддержкой различных типов схем.
-            </p>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-3">
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-database fa-2x text-primary mb-2"></i>
-                <h6 class="card-title">Коллекции</h6>
-                <p class="card-text small">
-                    Просмотр коллекций ChromaDB и их метаданных.
-                </p>
-                <a href="/collections" class="btn btn-primary btn-sm">
-                    <i class="fas fa-eye me-1"></i>Просмотреть
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-file-alt fa-2x text-success mb-2"></i>
-                <h6 class="card-title">Чанки</h6>
-                <p class="card-text small">
-                    Изучение индексированных чанков документов.
-                </p>
-                <a href="/chunks" class="btn btn-success btn-sm">
-                    <i class="fas fa-list me-1"></i>Просмотреть
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-search fa-2x text-warning mb-2"></i>
-                <h6 class="card-title">Поиск</h6>
-                <p class="card-text small">
-                    Семантический поиск по документам.
-                </p>
-                <a href="/search" class="btn btn-warning btn-sm">
-                    <i class="fas fa-search me-1"></i>Начать поиск
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-project-diagram fa-2x text-info mb-2"></i>
-                <h6 class="card-title">Векторы</h6>
-                <p class="card-text small">
-                    Визуализация векторного пространства.
-                </p>
-                <a href="/vectors" class="btn btn-info btn-sm">
-                    <i class="fas fa-chart-line me-1"></i>Просмотреть
-                </a>
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-1">
+                            <i class="fas fa-tachometer-alt text-primary me-2"></i>
+                            Dashboard
+                        </h4>
+                        <p class="text-muted mb-0 small">Vector database management and analysis tool</p>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge bg-success" id="connectionBadge">
+                            <i class="fas fa-circle me-1"></i>
+                            Ready
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-3">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-cog fa-2x text-secondary mb-2"></i>
-                <h6 class="card-title">Настройки</h6>
-                <p class="card-text small">
-                    Конфигурация базы данных, коллекций и сервера.
-                </p>
-                <a href="/settings" class="btn btn-secondary btn-sm">
-                    <i class="fas fa-cog me-1"></i>Настроить
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-info-circle fa-2x text-dark mb-2"></i>
-                <h6 class="card-title">О системе</h6>
-                <p class="card-text small">
-                    Информация о текущей конфигурации и статусе.
-                </p>
-                <button class="btn btn-outline-dark btn-sm" onclick="showSystemInfo()">
-                    <i class="fas fa-info me-1"></i>Подробнее
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-3">
+<!-- Quick Actions -->
+<div class="row mb-3">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h6 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>Статистика системы
+                    <i class="fas fa-bolt me-2"></i>
+                    Quick Actions
                 </h6>
             </div>
             <div class="card-body py-2">
-                <div class="row" id="stats-container">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-spinner fa-spin me-2"></i>
-                            <span>Загрузка статистики...</span>
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-primary w-100 p-2" onclick="window.location.href='/connections'">
+                            <i class="fas fa-plug fa-lg mb-1"></i>
+                            <div class="fw-bold small">Manage Connections</div>
+                            <small class="text-muted">Connect to databases</small>
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-success w-100 p-2" onclick="window.location.href='/search'">
+                            <i class="fas fa-search fa-lg mb-1"></i>
+                            <div class="fw-bold small">Search Documents</div>
+                            <small class="text-muted">Semantic search</small>
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-info w-100 p-2" onclick="window.location.href='/vectors'">
+                            <i class="fas fa-project-diagram fa-lg mb-1"></i>
+                            <div class="fw-bold small">Visualize Data</div>
+                            <small class="text-muted">Vector visualization</small>
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-warning w-100 p-2" onclick="window.location.href='/collections'">
+                            <i class="fas fa-database fa-lg mb-1"></i>
+                            <div class="fw-bold small">Browse Collections</div>
+                            <small class="text-muted">View collections</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-server me-2"></i>
+                    System Status
+                </h6>
+            </div>
+            <div class="card-body py-2">
+                <div class="row" id="systemStats">
+                    <div class="col-6">
+                        <div class="text-center">
+                            <div class="h5 mb-1 text-primary" id="collectionsCount">-</div>
+                            <div class="small text-muted">Collections</div>
                         </div>
                     </div>
+                    <div class="col-6">
+                        <div class="text-center">
+                            <div class="h5 mb-1 text-success" id="documentsCount">-</div>
+                            <div class="small text-muted">Documents</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-plug me-2"></i>
+                    Connection Status
+                </h6>
+            </div>
+            <div class="card-body py-2">
+                <div id="connectionInfo">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <span class="small">Loading connection status...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-history me-2"></i>
+                    Recent Activity
+                </h6>
+            </div>
+            <div class="card-body py-2">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Status</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityTable">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>
+                                    <span class="small">Loading activity...</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -140,97 +163,125 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    loadStats();
+    loadSystemStats();
+    loadConnectionInfo();
+    loadRecentActivity();
 });
 
-async function loadStats() {
+async function loadSystemStats() {
     try {
         const response = await fetch('/api/collections');
-        const collections = await response.json();
+        const data = await response.json();
         
-        const statsContainer = document.getElementById('stats-container');
-        
-        if (collections.error) {
-            statsContainer.innerHTML = `
-                <div class="col-12">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${collections.error}
-                    </div>
-                </div>
-            `;
+        if (data.error) {
+            document.getElementById('collectionsCount').textContent = '0';
+            document.getElementById('documentsCount').textContent = '0';
             return;
         }
         
+        const collections = data.collections || data;
         let totalDocuments = 0;
+        
         collections.forEach(col => {
             if (typeof col.document_count === 'number') {
                 totalDocuments += col.document_count;
             }
         });
         
-        statsContainer.innerHTML = `
-            <div class="col-md-6">
-                <h6>Коллекции</h6>
-                <p class="mb-0">
-                    <span class="badge bg-primary me-2">${collections.length}</span>
-                    доступно коллекций
-                </p>
-            </div>
-            <div class="col-md-6">
-                <h6>Документы</h6>
-                <p class="mb-0">
-                    <span class="badge bg-success me-2">${totalDocuments}</span>
-                    всего документов
-                </p>
-            </div>
-        `;
+        document.getElementById('collectionsCount').textContent = collections.length;
+        document.getElementById('documentsCount').textContent = totalDocuments;
+        
     } catch (error) {
-        console.error('Ошибка загрузки статистики:', error);
-        document.getElementById('stats-container').innerHTML = `
-            <div class="col-12">
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    Ошибка загрузки статистики
+        console.error('Error loading system stats:', error);
+        document.getElementById('collectionsCount').textContent = '0';
+        document.getElementById('documentsCount').textContent = '0';
+    }
+}
+
+async function loadConnectionInfo() {
+    try {
+        const response = await fetch('/api/connections');
+        const data = await response.json();
+        
+        const connectionInfo = document.getElementById('connectionInfo');
+        const connectionBadge = document.getElementById('connectionBadge');
+        
+        if (data.status && data.status.is_connected) {
+            const conn = data.status.active_connection;
+            connectionInfo.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="status-indicator status-connected me-2"></div>
+                    <div>
+                        <div class="fw-bold">${conn.name}</div>
+                        <small class="text-muted">${conn.collection_name}</small>
+                    </div>
                 </div>
+            `;
+            connectionBadge.className = 'badge bg-success fs-6';
+            connectionBadge.innerHTML = '<i class="fas fa-circle me-1"></i>Connected';
+        } else {
+            connectionInfo.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="status-indicator status-disconnected me-2"></div>
+                    <div>
+                        <div class="fw-bold">No Connection</div>
+                        <small class="text-muted">Connect to a database to start</small>
+                    </div>
+                </div>
+            `;
+            connectionBadge.className = 'badge bg-warning fs-6';
+            connectionBadge.innerHTML = '<i class="fas fa-circle me-1"></i>Disconnected';
+        }
+        
+    } catch (error) {
+        console.error('Error loading connection info:', error);
+        document.getElementById('connectionInfo').innerHTML = `
+            <div class="text-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading connection status
             </div>
         `;
     }
 }
 
-async function showSystemInfo() {
+async function loadRecentActivity() {
     try {
-        const response = await fetch('/api/settings');
-        const settings = await response.json();
+        // Simulate recent activity for now
+        const activities = [
+            {
+                time: new Date().toLocaleTimeString(),
+                action: 'System Started',
+                status: 'Success',
+                details: 'Vector View initialized'
+            },
+            {
+                time: new Date(Date.now() - 300000).toLocaleTimeString(),
+                action: 'Connection Check',
+                status: 'Success',
+                details: 'Database connection verified'
+            }
+        ];
         
-        if (response.ok) {
-            const info = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Конфигурация базы данных:</h6>
-                        <ul class="list-unstyled small">
-                            <li><strong>Путь:</strong> ${settings.chroma_db_path}</li>
-                            <li><strong>Коллекция:</strong> ${settings.collection_name}</li>
-                            <li><strong>Модель:</strong> ${settings.embedding_model}</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Настройки сервера:</h6>
-                        <ul class="list-unstyled small">
-                            <li><strong>Хост:</strong> ${settings.flask_host}</li>
-                            <li><strong>Порт:</strong> ${settings.flask_port}</li>
-                            <li><strong>Отладка:</strong> ${settings.flask_debug ? 'Включена' : 'Отключена'}</li>
-                        </ul>
-                    </div>
-                </div>
-            `;
-            
-            showAlert(info, 'info');
-        } else {
-            showAlert('Ошибка загрузки информации о системе: ' + settings.error, 'danger');
-        }
+        const activityTable = document.getElementById('activityTable');
+        activityTable.innerHTML = activities.map(activity => `
+            <tr>
+                <td>${activity.time}</td>
+                <td>${activity.action}</td>
+                <td><span class="badge bg-success">${activity.status}</span></td>
+                <td>${activity.details}</td>
+            </tr>
+        `).join('');
+        
     } catch (error) {
-        showAlert('Ошибка загрузки информации о системе: ' + error.message, 'danger');
+        console.error('Error loading recent activity:', error);
+        document.getElementById('activityTable').innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading activity
+                </td>
+            </tr>
+        `;
     }
 }
 </script>
